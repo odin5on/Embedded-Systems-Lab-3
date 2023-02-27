@@ -16,6 +16,7 @@
 
 rjmp initialize
 ;array for lookup table of numbers
+; need ABCDEF for lookup table
 numbers: .db 0b01110111, 0b00010100, 0b10110011, 0b10110110, 0b11010100, 0b11100110, 0b11100111, 0b00110100, 0b11110111, 0b11110110, 0b10000000, 0b00000000
 
 ;Psuedocode for rest of project:
@@ -29,7 +30,8 @@ initialize:
 	sbi DDRB, 4 ;RCLK
 	sbi DDRB, 5 ;SER
 	cbi DDRB, 2 ; pushbutton count input
-	cbi DDRB, 1 ; pushbutton reset input
+	cbi DDRB, 1 ; rpg pin 1
+	cbi DDRB, 0 ; rpg pin 2
 
 
 	ldi R23, 0
@@ -51,24 +53,19 @@ start:
 	ldi ZH, HIGH(numbers<<1)
 	ldi ZL, LOW(numbers<<1)
 
-	ldi R20, 0
 	ldi R21, 0
 
-	add ZL, R20
-	lpm R16, Z
-	ldi ZL, LOW(numbers<<1)
 	add ZL, R21
-	lpm R18, Z
+	lpm R16, Z
+	rcall display
 
 ; this loop is the main process of the program
 start_loop:
 	sbis PINB, 2
-		rcall increment_timer_value
-	sbis PINB, 2
 		rjmp reset
-	sbis PINB, 1
-		rcall decrement_timer_value
+	
 mid_loop:
+	rcall check_inputs
 	ldi R23, 0
 	rcall display ; call display subroutine
 
@@ -78,7 +75,7 @@ mid_loop:
 display: 
 	; backup used registers on stack
 	push R16
-	push R18 ;new code
+
 	push R17
 	in R17, SREG
 	push R17
@@ -91,36 +88,19 @@ loop: ; this loop loads in the right digit
 	BRCS set_ser_in_1 ; branch if Carry is set
 	cbi PORTB, 5 ; put code here to set SER to 0	
 	
-	rjmp end2
-
-loop2: ; this loop loads in the left digit
-	rol R18
-	BRCS set_ser_in_1_2
-	cbi PORTB, 5
 	rjmp end
 
 set_ser_in_1:
 	; put code here to set SER to 1...
 	sbi PORTB, 5
 
-end2:
-	sbi PORTB, 3
-	cbi PORTB, 3
-	dec R17
-	brne loop
-
-	ldi R17, 8
-	rjmp loop2
-
-set_ser_in_1_2:
-	sbi PORTB, 5
-
 end:
 	; put code here to generate SRCLK pulse...
 	sbi PORTB, 3
+	nop
 	cbi PORTB, 3
 	dec R17
-	brne loop2
+	brne loop
 
 	; put code here to generate RCLK pulse
 	sbi PORTB, 4
@@ -130,11 +110,9 @@ end:
 	pop R17
 	out SREG, R17
 	pop R17
-	pop R18
 	pop R16
 
 	ret  ; end of display function
-
 
 increment_timer_value:
 	in R22, SREG
@@ -143,37 +121,21 @@ increment_timer_value:
 	ldi ZH, HIGH(numbers<<1)
 	ldi ZL, LOW(numbers<<1)
 
-	ldi R22, 9
-	cpse R20, R22
-		rjmp inc_lower_digit
-
-
-inc_upper_digit:
-	ldi R20, 0
-	inc R21
+	ldi R22, 9 ;change to 16 in future
+	cpse R21, R22
+		rjmp inc_digit	
 	rjmp end_increment_timer_value
 
-inc_lower_digit:
-	cpi R21,2
-	brne inc_1
-	cpi R20,5
-	brne inc_1
-	rjmp end_increment_timer_value
+	inc_digit:
+		inc R21
+		add ZL, R21
+		lpm R16, Z
 
-inc_1:
-	inc R20
-
-end_increment_timer_value:
-	add ZL, R20
-	lpm R16, Z
-	ldi ZL, LOW(numbers<<1)
-	add ZL, R21
-	lpm R18, Z
-
-	pop R22
-	out SREG, R22
-
-	ret ; end of increment_timer_value function
+	end_increment_timer_value:
+		pop R22
+		out SREG, R22
+		ret
+	
 
 decrement_timer_value:
 	in R22, SREG
@@ -218,20 +180,14 @@ decrement_timer_wo_stack_stuff:
 		lpm R16, Z
 		ldi ZL, LOW(numbers<<1)
 		add ZL, R21
-		lpm R18, Z
 		rcall display
 		rjmp decrement_timer_wo_stack_stuff
 
 	decrement_return:
-		rcall timer_end_blinky
-		rcall timer_end_blinky
-		rcall timer_end_blinky
-		rcall timer_end_blinky
 
 
 		ldi ZL, LOW(numbers<<1)
 		lpm R16, Z
-		lpm R18, Z
 		rcall display
 
 		pop R22
@@ -253,45 +209,39 @@ d2:
 	sbiw r31:r30, 1 ; r31:r30 <-- r31:r30 - 1
 	brne d1 ; branch to d1 if result is not "0"	
 	nop
-	ret ; return				
+	ret ; return	
 
 
-timer_end_blinky: ; this function flashed dashes on the displays for .5s on then .5s off
-	in R22, SREG
-	push R22
-	push R23
-
-	ldi R23, 10
-	ldi ZH, HIGH(numbers<<1)
-	ldi ZL, LOW(numbers<<1)
-
-	add ZL, R23
-	lpm R16, Z
-	lpm R18, Z
-
-	rcall display
-
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-
-	ldi R23, 11
-	ldi ZL, LOW(numbers<<1)
-	add ZL, R23
-	lpm R16, Z
-	lpm R18, Z
-
-	rcall display
-
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-
-	pop R23
-	pop R22
-	out SREG, R22
+delay_short:
+	.equ count2 = 0x2710
+	ldi r30, low(count2)
+	ldi r31, high(count2)
+d3:
+	sbiw r31:r30, 1	
+	brne d3
 	ret
+
+check_inputs:
+	in R24, PINB
+	andi R24, 0x03
+	lsl R24
+	lsl R24
+	mov R25, R24
+	rcall delay_short
+	in r24, PINB
+	andi R24, 0x03
+	or R24, R25
+	andi R24, 0x0F
+	ldi R25, 0x04
+	cpse R24, R25
+		rjmp next_check
+	rcall increment_timer_value
+	rjmp check_inputs_end
+next_check:
+	ldi R25, 0x08
+	cpse R24, R25
+		rjmp check_inputs_end
+	rcall increment_timer_value
+check_inputs_end:
+	ret
+
