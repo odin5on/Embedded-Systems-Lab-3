@@ -17,7 +17,7 @@
 rjmp initialize
 ;array for lookup table of numbers
 ; need ABCDEF for lookup table
-numbers: .db 0b01110111, 0b00010100, 0b10110011, 0b10110110, 0b11010100, 0b11100110, 0b11100111, 0b00110100, 0b11110111, 0b11110110, 0b10000000, 0b00000000
+numbers: .db 0b01110111, 0b00010100, 0b10110011, 0b10110110, 0b11010100, 0b11100110, 0b11100111, 0b00110100, 0b11110111, 0b11110110, 0b11110101, 0b11000111, 0b01100011, 0b10010111, 0b11100011, 0b11100001
 
 ;Psuedocode for rest of project:
 ;incrementing numbers with button A:
@@ -121,7 +121,7 @@ increment_timer_value:
 	ldi ZH, HIGH(numbers<<1)
 	ldi ZL, LOW(numbers<<1)
 
-	ldi R22, 9 ;change to 16 in future
+	ldi R22, 15 ;change to 16 in future
 	cpse R21, R22
 		rjmp inc_digit	
 	rjmp end_increment_timer_value
@@ -136,64 +136,28 @@ increment_timer_value:
 		out SREG, R22
 		ret
 	
-
 decrement_timer_value:
 	in R22, SREG
 	push R22
-
-
-decrement_timer_wo_stack_stuff:
-	rcall delay_long ; 100ms delay, called 10 times
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
-	rcall delay_long
 
 	ldi ZH, HIGH(numbers<<1)
 	ldi ZL, LOW(numbers<<1)
 
 	ldi R22, 0
-
-	cpse R20, R22
-		rjmp decrement_ones
-
 	cpse R21, R22
-		rjmp decrement_tens
+		rjmp dec_digit
+	rjmp end_decrement_timer_value
 
-	rjmp decrement_return
-
-	decrement_tens:
+	dec_digit:
 		dec R21
-		ldi R20, 9
-		rjmp decrement_end
-
-	decrement_ones:
-		dec R20
-		
-	decrement_end:
-		add ZL, R20
-		lpm R16, Z
-		ldi ZL, LOW(numbers<<1)
 		add ZL, R21
-		rcall display
-		rjmp decrement_timer_wo_stack_stuff
-
-	decrement_return:
-
-
-		ldi ZL, LOW(numbers<<1)
 		lpm R16, Z
-		rcall display
 
+	end_decrement_timer_value:
 		pop R22
 		out SREG, R22
-		ret ; end of decrement_timer_value function
-		
+		ret
+
 
 delay_long: ; this method is taken from lab 1 but changed to be 100ms long
 	;100 ms long
@@ -235,7 +199,7 @@ check_inputs:
 	ldi R25, 0x04
 	cpse R24, R25
 		rjmp next_check
-	rcall increment_timer_value
+	rcall decrement_timer_value
 	rjmp check_inputs_end
 next_check:
 	ldi R25, 0x08
