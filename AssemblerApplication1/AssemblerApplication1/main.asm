@@ -35,6 +35,9 @@ initialize:
 	cbi DDRB, 1 ; rpg pin 1
 	cbi DDRB, 0 ; rpg pin 2
 
+	ldi R28, 0x04
+	out 0x33, R30
+
 	.def inputcounter = R26
 		ldi inputcounter, 0
 	.def wrongvalue = R27
