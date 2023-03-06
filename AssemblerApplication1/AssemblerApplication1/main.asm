@@ -17,7 +17,9 @@
 rjmp initialize
 ;array for lookup table of numbers
 ; need ABCDEF for lookup table
-numbers: .db 0b01110111, 0b00010100, 0b10110011, 0b10110110, 0b11010100, 0b11100110, 0b11100111, 0b00110100, 0b11110111, 0b11110110, 0b11110101, 0b11000111, 0b01100011, 0b10010111, 0b11100011, 0b11100001
+numbers: .db 0b01110111, 0b00010100, 0b10110011, 0b10110110, 0b11010100, 0b11100110, 0b11100111, 0b00110100, 0b11110111, 0b11110110, 0b11110101, 0b11000111, 0b01100011, 0b10010111, 0b11100011, 0b11100001, 0b00001000, 0b11111111
+
+code: .db 0x04, 0x0D, 0x02, 0x02, 0x0E
 
 ;Psuedocode for rest of project:
 ;incrementing numbers with button A:
@@ -28,10 +30,17 @@ numbers: .db 0b01110111, 0b00010100, 0b10110011, 0b10110110, 0b11010100, 0b11100
 initialize:
 	sbi DDRB, 3 ;SRCLK
 	sbi DDRB, 4 ;RCLK
-	sbi DDRB, 5 ;SER
+	sbi DDRD, 7 ;SER
 	cbi DDRB, 2 ; pushbutton count input
 	cbi DDRB, 1 ; rpg pin 1
 	cbi DDRB, 0 ; rpg pin 2
+
+	.def inputcounter = R26
+		ldi inputcounter, 0
+	.def wrongvalue = R27
+		ldi wrongvalue, 0
+	.def displayvalue = R21
+	.def displaybincode = R16
 
 
 	ldi R23, 0
@@ -62,6 +71,8 @@ start:
 ; this loop is the main process of the program
 start_loop:
 	sbis PINB, 2
+		rcall check_input
+	sbis PINB, 2
 		rjmp reset
 	
 mid_loop:
@@ -70,6 +81,83 @@ mid_loop:
 	rcall display ; call display subroutine
 
 	rjmp start_loop
+
+check_input:
+	in R22, SREG
+	push R22
+	push R17
+
+	ldi ZH, HIGH(code<<1)
+	ldi ZL, LOW(code<<1)
+	add ZL, inputcounter
+	lpm R17, Z
+
+	cpse R17, displayvalue
+		ldi wrongvalue, 1
+	inc inputcounter
+
+	cpi inputcounter, 5
+	brne check_input_end
+
+	rcall turn_on_light
+	ldi inputcounter, 0
+
+	check_input_end:
+		pop R17
+		pop R22
+		out SREG, R22
+		ret
+
+turn_on_light:
+	in R22, SREG
+	push R22
+	push R17
+
+	cpi wrongvalue, 1
+	breq wrong_light
+
+	ldi ZH, HIGH(numbers<<1)
+	ldi ZL, LOW(numbers<<1)
+	ldi R17, 16
+	add ZL, R17
+	lpm R16, Z
+	rcall display
+	rcall delay_long
+			rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+	rjmp turn_on_light_end
+
+	wrong_light:
+		ldi ZH, HIGH(numbers<<1)
+		ldi ZL, LOW(numbers<<1)
+		ldi R17, 17
+		add ZL, R17
+		lpm R16, Z
+		rcall display
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+		rcall delay_long
+
+	turn_on_light_end:
+		ldi inputcounter, 0
+		ldi wrongvalue, 0
+		
+		pop R22
+		out SREG, R22
+		ret
 
 
 display: 
@@ -86,13 +174,13 @@ display:
 loop: ; this loop loads in the right digit
 	rol R16 ; rotate left trough Carry
 	BRCS set_ser_in_1 ; branch if Carry is set
-	cbi PORTB, 5 ; put code here to set SER to 0	
+	cbi PORTD, 7 ; put code here to set SER to 0	
 	
 	rjmp end
 
 set_ser_in_1:
 	; put code here to set SER to 1...
-	sbi PORTB, 5
+	sbi PORTD, 7
 
 end:
 	; put code here to generate SRCLK pulse...
