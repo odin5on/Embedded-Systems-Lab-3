@@ -16,16 +16,11 @@
 
 rjmp initialize
 ;array for lookup table of numbers
-; need ABCDEF for lookup table
 numbers: .db 0b01110111, 0b00010100, 0b10110011, 0b10110110, 0b11010100, 0b11100110, 0b11100111, 0b00110100, 0b11110111, 0b11110110, 0b11110101, 0b11000111, 0b01100011, 0b10010111, 0b11100011, 0b11100001, 0b00001000, 0b00000010, 0b10000000
 
+;array for lock code
 code: .db 0x04, 0x0D, 0x02, 0x02, 0x0E
 
-;Psuedocode for rest of project:
-;incrementing numbers with button A:
-;when the pushbutton opens then closes, increment R16 by correct amount to reach next num (may need to rework hardware connections for this)
-;counting down with Button B:
-; when b is pressed, run subroutine that decrements r16 by an amount with a simuular delay_long function after it to simulate every second 
 
 initialize:
 	sbi DDRB, 5 ;Yellow LED
@@ -36,6 +31,7 @@ initialize:
 	cbi DDRB, 1 ; rpg pin 1
 	cbi DDRB, 0 ; rpg pin 2
 
+	;config timer
 	ldi R28, 0x00
 	out TCCR0A, R28
 	ldi R28, 0x04
@@ -55,7 +51,7 @@ initialize:
 	rjmp start
 
 reset:
-	; when button a is pressed, the process comes here to reset the displays to zeros
+	; when button is held, it goes through here
 	rcall timer_delay_100ms
 	inc R23
 	cpi R23, 20
@@ -66,7 +62,7 @@ reset:
 	rjmp mid_loop
 
 start:
-	; load zeros onto display
+	; load dash onto display
 	ldi ZH, HIGH(numbers<<1)
 	ldi ZL, LOW(numbers<<1)
 
@@ -82,7 +78,6 @@ start:
 start_loop:
 	sbis PINB, 2
 		rjmp reset
-
 	
 mid_loop:
 	rcall check_rpg_inputs
@@ -91,6 +86,7 @@ mid_loop:
 
 	rjmp start_loop
 
+;checks input value when button is pressed against the correct code
 check_input:
 		in R22, SREG
 		push R22
@@ -117,6 +113,8 @@ check_input:
 		out SREG, R22
 		ret
 
+; turns on yellow light on arduino and decimal point on display for 5 seconds if correct code
+; turns on "_" on display if for 9 seconds if code is wrong
 turn_on_light:
 		in R22, SREG
 		push R22
@@ -211,6 +209,7 @@ display:
 
 		ret  ; end of display function
 
+
 increment_timer_value:
 		in R22, SREG
 		push R22
@@ -274,6 +273,7 @@ decrement_timer_value:
 		ret
 
 
+;used to debounce rpg
 delay_short:
 		.equ count2 = 0x2710
 		ldi r30, low(count2)
@@ -283,6 +283,7 @@ delay_short:
 		brne d3
 		ret
 
+;looks at input from rpg to tell if it is rotating
 check_rpg_inputs:
 		in R24, PINB
 		andi R24, 0x03
@@ -337,7 +338,7 @@ timer_delay_4ms:
 		out SREG, R22
 		ret
 
-
+; loops over timer_delay_4ms 25 times
 timer_delay_100ms:
 		in R22, SREG
 		push R22
